@@ -1,5 +1,9 @@
 package gojq
 
+import (
+	"unsafe"
+)
+
 type code struct {
 	v  interface{}
 	op opcode
@@ -105,4 +109,8 @@ func (op opcode) String() string {
 	default:
 		panic(op)
 	}
+}
+
+func (c code) memSize() uintptr {
+	return unsafe.Sizeof(c) + sizeofValue(c.v)
 }

@@ -1,5 +1,9 @@
 package gojq
 
+import (
+	"unsafe"
+)
+
 type stack struct {
 	data  []block
 	index int
@@ -53,4 +57,16 @@ func (s *stack) save() (index, limit int) {
 
 func (s *stack) restore(index, limit int) {
 	s.index, s.limit = index, limit
+}
+
+func (s *stack) memSize() uintptr {
+	size := unsafe.Sizeof(*s)
+	for _, block := range s.data {
+		size = size + block.memSize()
+	}
+	return size
+}
+
+func (b block) memSize() uintptr {
+	return unsafe.Sizeof(b) + sizeofValue(b.value)
 }

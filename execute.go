@@ -2,9 +2,11 @@ package gojq
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"reflect"
 	"sort"
+	"unsafe"
 )
 
 func (env *env) execute(bc *Code, v interface{}, vars ...interface{}) Iter {
@@ -25,6 +27,7 @@ func (env *env) Next() (interface{}, bool) {
 	defer func() { env.pc, env.backtrack = pc, true }()
 loop:
 	for ; pc < len(env.codes); pc++ {
+		env.trace()
 		env.debugState(pc, backtrack)
 		code := env.codes[pc]
 		if hasCtx {
@@ -366,6 +369,9 @@ loop:
 	if err != nil {
 		return err, true
 	}
+	env.trace()
+	fmt.Printf("cycles: %d\n", env.cycleCounter)
+	fmt.Printf("memsize: %d bytes\n", env.memorySize)
 	return nil, false
 }
 
@@ -416,6 +422,35 @@ func (env *env) index(v [2]int) int {
 	panic("env.index")
 }
 
+func (env *env) trace() {
+	env.cycleCounter++
+	env.traceMemSize()
+}
+
+func (env *env) traceMemSize() {
+	// calculate storage size
+	size := unsafe.Sizeof(env)
+	size += uintptr(env.stack.memSize())
+	size += uintptr(env.paths.memSize())
+	size += uintptr(env.scopes.memSize())
+
+	for _, code := range env.codes {
+		size += code.memSize()
+	}
+
+	for _, val := range env.values {
+		size += sizeofValue(val)
+	}
+
+	for _, val := range env.args {
+		size += sizeofValue(val)
+	}
+
+	if int(size) > env.memorySize {
+		env.memorySize = int(size)
+	}
+}
+
 type pathValue struct {
 	path, value interface{}
 }
@@ -450,4 +485,16 @@ func (env *env) poppaths() []interface{} {
 		xs[i], xs[j] = xs[j], xs[i]
 	}
 	return xs
+}
+
+func sizeofValue(val interface{}) uintptr {
+	if val == nil {
+		return 0
+	}
+	size := reflect.TypeOf(val).Size()
+	if str, ok := val.(string); ok {
+		size += uintptr(len(str))
+	}
+
+	return size
 }

@@ -1,5 +1,9 @@
 package gojq
 
+import (
+	"unsafe"
+)
+
 type scopeStack struct {
 	data  []scopeBlock
 	index int
@@ -49,4 +53,11 @@ func (s *scopeStack) save() (index, limit int) {
 
 func (s *scopeStack) restore(index, limit int) {
 	s.index, s.limit = index, limit
+}
+
+func (s *scopeStack) memSize() uintptr {
+	size := unsafe.Sizeof(s)
+	blockSize := unsafe.Sizeof(scopeBlock{})
+	totalBlockSize := uintptr(len(s.data)) * blockSize
+	return size + totalBlockSize
 }
